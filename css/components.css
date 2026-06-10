@@ -113,6 +113,10 @@
   }
 }
 
+[data-theme="dark"] .btn--danger:hover {
+  background: #3a1a1a;
+}
+
 .btn-upload {
   display: inline-flex;
   align-items: center;
@@ -147,4 +151,101 @@
 .empty-state {
   font-size: 13px;
   color: var(--color-text-tertiary);
+}
+
+/* ── Coordinates display ─────────────────────────────────────────────────── */
+.coords-display {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 7px 10px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 0.5px solid var(--color-border-soft);
+}
+
+.coords-display__item {
+  flex: 1;
+  text-align: center;
+}
+
+.coords-display__label {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.coords-display__value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Inline edit overlay in elem-item ────────────────────────────────────── */
+.elem-item__edit-btn {
+  width: auto;
+  padding: 4px 6px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  border-color: transparent;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.elem-item:hover .elem-item__edit-btn {
+  opacity: 1;
+}
+
+/* Edit name inline */
+.elem-item__name-input {
+  flex: 1;
+  font-size: 13px;
+  padding: 2px 5px;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border: 0.5px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+/* Edit modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  padding: 1rem;
+}
+
+.modal {
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border-medium);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  width: 100%;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+.modal__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 14px;
+}
+
+.modal__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.modal__actions .btn {
+  flex: 1;
 }

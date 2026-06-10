@@ -52,6 +52,14 @@ export function updateElementScores(id, scores) {
   }
 }
 
+export function updateElementMeta(id, { name, photo }) {
+  const el = state.elements.find(e => e.id === id);
+  if (!el) return;
+  if (name !== undefined) el.name = name;
+  if (photo !== undefined) el.photo = photo;
+  notify();
+}
+
 export function selectElement(id) {
   state.selectedId = id;
   notify();

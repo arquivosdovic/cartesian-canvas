@@ -14,6 +14,7 @@
 .toolbar__actions {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .btn--toolbar {
@@ -34,6 +35,16 @@
 .btn--toolbar-primary:hover {
   opacity: 0.85;
   background: var(--color-accent-light);
+}
+
+/* Theme toggle button */
+.btn--theme {
+  width: auto;
+  padding: 6px 8px;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-md);
 }
 
 /* ── Toast notification ──────────────────────────────────────────────────── */

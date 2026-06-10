@@ -1,8 +1,6 @@
 /**
  * renderer.js
  * Handles all Canvas 2D drawing of the cartesian plane.
- * The key fix for long labels: axis labels are drawn OUTSIDE the plot area,
- * with wrapping and dynamic padding to ensure they are fully visible.
  */
 
 import { state } from './store.js';
@@ -12,9 +10,6 @@ const IMAGE_CACHE = new Map();
 const AVATAR_RADIUS = 18;
 const MAX_SCORE = 10;
 
-/**
- * Preload or retrieve cached Image object for an element.
- */
 function getImage(element) {
   if (!element.photo) return null;
   if (!IMAGE_CACHE.has(element.id)) {
@@ -47,20 +42,6 @@ export function requestRedraw() {
   }
 }
 
-/**
- * Measure the width of a label at the given font settings.
- */
-function measureLabel(ctx, text, font) {
-  ctx.save();
-  ctx.font = font;
-  const w = ctx.measureText(text).width;
-  ctx.restore();
-  return w;
-}
-
-/**
- * Draw text that wraps within maxWidth, returning the total height used.
- */
 function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
   const words = text.split(' ');
   let line = '';
@@ -80,11 +61,6 @@ function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
   return currentY - y + lineHeight;
 }
 
-/**
- * Compute the position of an element in canvas coordinates.
- * x = (right - left) / MAX_SCORE  mapped to [cx-rW, cx+rW]
- * y = (top - bottom) / MAX_SCORE  mapped to [cy+rH, cy-rH]  (canvas Y flipped)
- */
 function calcCanvasPos(scores, cx, cy, rW, rH) {
   const nx = (scores.right - scores.left) / MAX_SCORE;
   const ny = (scores.top - scores.bottom) / MAX_SCORE;
@@ -94,22 +70,19 @@ function calcCanvasPos(scores, cx, cy, rW, rH) {
   };
 }
 
-/**
- * Detect dark mode via CSS variable or media query.
- */
 function isDarkMode() {
+  if (document.documentElement.dataset.theme === 'dark') return true;
+  if (document.documentElement.dataset.theme === 'light') return false;
   const bg = getComputedStyle(document.documentElement)
     .getPropertyValue('--color-bg-primary').trim();
   if (bg) {
-    const r = parseInt(bg.slice(1, 3), 16);
+    const hex = bg.replace('#', '');
+    const r = parseInt(hex.slice(0, 2), 16);
     return r < 80;
   }
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-/**
- * Resolve CSS variable or fallback.
- */
 function cssVar(name, fallback) {
   return getComputedStyle(document.documentElement)
     .getPropertyValue(name).trim() || fallback;
@@ -122,6 +95,8 @@ export function draw(canvas) {
   const W = canvas.clientWidth;
   const H = canvas.clientHeight;
 
+  if (W === 0 || H === 0) return;
+
   canvas.width = W * dpr;
   canvas.height = H * dpr;
 
@@ -130,35 +105,27 @@ export function draw(canvas) {
   ctx.clearRect(0, 0, W, H);
 
   const dark = isDarkMode();
-  const textColor  = cssVar('--color-text-primary',   dark ? '#e8e8e8' : '#1a1a1a');
-  const mutedColor = cssVar('--color-text-secondary',  dark ? '#aaa9a4' : '#5f5e5a');
-  const axisColor  = cssVar('--color-axis',            dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)');
-  const gridColor  = cssVar('--color-grid',            dark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.055)');
-  const labelBg    = cssVar('--color-label-bg',        dark ? 'rgba(30,30,30,0.88)' : 'rgba(255,255,255,0.88)');
-  const accentColor = cssVar('--color-accent', '#7f77dd');
-  const accentLight = cssVar('--color-accent-light', '#eeedfe');
-  const accentDark  = cssVar('--color-accent-dark', '#3c3489');
+  const textColor   = cssVar('--color-text-primary',   dark ? '#e8e8e8' : '#1a1a1a');
+  const axisColor   = cssVar('--color-axis',            dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)');
+  const gridColor   = cssVar('--color-grid',            dark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.055)');
+  const labelBg     = cssVar('--color-label-bg',        dark ? 'rgba(30,30,30,0.88)' : 'rgba(255,255,255,0.88)');
+  const accentColor = cssVar('--color-accent', dark ? '#9d96e8' : '#7f77dd');
+  const accentLight = cssVar('--color-accent-light', dark ? '#2a2654' : '#eeedfe');
+  const accentDark  = cssVar('--color-accent-dark',  dark ? '#cbc8f8' : '#3c3489');
 
-  const LABEL_FONT  = '500 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  const AXIS_LABEL_MAX_W = W * 0.18; // max width for side labels before wrapping
-  const LABEL_LINE_H = 16;
-  const LABEL_PADDING = 10; // gap between label text and axis arrow tip
+  const LABEL_FONT      = '500 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  const AXIS_LABEL_MAX_W = W * 0.18;
+  const LABEL_LINE_H    = 16;
+  const LABEL_PADDING   = 10;
 
-  // ── Measure label widths to compute dynamic padding ──────────────────────
   ctx.font = LABEL_FONT;
-  const topLabelW    = ctx.measureText(state.labels.top).width;
-  const bottomLabelW = ctx.measureText(state.labels.bottom).width;
-
-  // For side labels we allow wrapping, so padding = min(actual width, max allowed) + gap
   const leftLabelW  = Math.min(ctx.measureText(state.labels.left).width,  AXIS_LABEL_MAX_W);
   const rightLabelW = Math.min(ctx.measureText(state.labels.right).width, AXIS_LABEL_MAX_W);
+  const leftLines   = Math.ceil(ctx.measureText(state.labels.left).width  / AXIS_LABEL_MAX_W);
+  const rightLines  = Math.ceil(ctx.measureText(state.labels.right).width / AXIS_LABEL_MAX_W);
 
-  // Number of wrap lines for side labels (approximate)
-  const leftLines  = Math.ceil(ctx.measureText(state.labels.left).width  / AXIS_LABEL_MAX_W);
-  const rightLines = Math.ceil(ctx.measureText(state.labels.right).width / AXIS_LABEL_MAX_W);
-
-  const padTop    = LABEL_LINE_H * 1 + LABEL_PADDING + 20;
-  const padBottom = LABEL_LINE_H * 1 + LABEL_PADDING + 20;
+  const padTop    = LABEL_LINE_H + LABEL_PADDING + 20;
+  const padBottom = LABEL_LINE_H + LABEL_PADDING + 20;
   const padLeft   = leftLabelW  + LABEL_PADDING + 16;
   const padRight  = rightLabelW + LABEL_PADDING + 16;
 
@@ -172,23 +139,20 @@ export function draw(canvas) {
   const rW = plotW / 2;
   const rH = plotH / 2;
 
-  // ── Grid lines ────────────────────────────────────────────────────────────
+  // ── Grid ─────────────────────────────────────────────────────────────────
   ctx.strokeStyle = gridColor;
   ctx.lineWidth = 0.5;
   const steps = 4;
   for (let i = 1; i <= steps; i++) {
     const f = i / steps;
-    // Vertical
     [cx + rW * f, cx - rW * f].forEach(x => {
       ctx.beginPath(); ctx.moveTo(x, plotY); ctx.lineTo(x, plotY + plotH); ctx.stroke();
     });
-    // Horizontal
     [cy + rH * f, cy - rH * f].forEach(y => {
       ctx.beginPath(); ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW, y); ctx.stroke();
     });
   }
 
-  // ── Plot border ───────────────────────────────────────────────────────────
   ctx.strokeStyle = gridColor;
   ctx.lineWidth = 0.5;
   ctx.strokeRect(plotX, plotY, plotW, plotH);
@@ -199,30 +163,24 @@ export function draw(canvas) {
   ctx.fillStyle   = axisColor;
   ctx.lineWidth   = 1;
 
-  // Horizontal axis
   ctx.beginPath(); ctx.moveTo(plotX, cy); ctx.lineTo(plotX + plotW, cy); ctx.stroke();
-  // Right arrow
   ctx.beginPath();
   ctx.moveTo(plotX + plotW, cy);
   ctx.lineTo(plotX + plotW - arrowLen, cy - arrowLen / 2);
   ctx.lineTo(plotX + plotW - arrowLen, cy + arrowLen / 2);
   ctx.closePath(); ctx.fill();
-  // Left arrow
   ctx.beginPath();
   ctx.moveTo(plotX, cy);
   ctx.lineTo(plotX + arrowLen, cy - arrowLen / 2);
   ctx.lineTo(plotX + arrowLen, cy + arrowLen / 2);
   ctx.closePath(); ctx.fill();
 
-  // Vertical axis
   ctx.beginPath(); ctx.moveTo(cx, plotY); ctx.lineTo(cx, plotY + plotH); ctx.stroke();
-  // Top arrow
   ctx.beginPath();
   ctx.moveTo(cx, plotY);
   ctx.lineTo(cx - arrowLen / 2, plotY + arrowLen);
   ctx.lineTo(cx + arrowLen / 2, plotY + arrowLen);
   ctx.closePath(); ctx.fill();
-  // Bottom arrow
   ctx.beginPath();
   ctx.moveTo(cx, plotY + plotH);
   ctx.lineTo(cx - arrowLen / 2, plotY + plotH - arrowLen);
@@ -233,23 +191,19 @@ export function draw(canvas) {
   ctx.font = LABEL_FONT;
   ctx.fillStyle = textColor;
 
-  // Top label — centered above plot area
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.fillText(state.labels.top, cx, plotY - LABEL_PADDING);
 
-  // Bottom label — centered below plot area
   ctx.textBaseline = 'top';
   ctx.fillText(state.labels.bottom, cx, plotY + plotH + LABEL_PADDING);
 
-  // Left label — right-aligned, vertically centered, wrapped
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   const leftTotalH = leftLines * LABEL_LINE_H;
   const leftStartY = cy - leftTotalH / 2 + LABEL_LINE_H / 2;
   drawWrappedText(ctx, state.labels.left, plotX - LABEL_PADDING, leftStartY, AXIS_LABEL_MAX_W, LABEL_LINE_H);
 
-  // Right label — left-aligned, vertically centered, wrapped
   ctx.textAlign = 'left';
   const rightTotalH = rightLines * LABEL_LINE_H;
   const rightStartY = cy - rightTotalH / 2 + LABEL_LINE_H / 2;
@@ -262,7 +216,6 @@ export function draw(canvas) {
     const pos = calcCanvasPos(el.scores, cx, cy, rW, rH);
     const isSelected = el.id === state.selectedId;
 
-    // Selection ring
     if (isSelected) {
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, AVATAR_RADIUS + 4, 0, Math.PI * 2);
@@ -271,7 +224,6 @@ export function draw(canvas) {
       ctx.stroke();
     }
 
-    // Avatar circle
     const img = getImage(el);
     if (img && img.complete && img.naturalWidth > 0) {
       ctx.save();
@@ -295,7 +247,6 @@ export function draw(canvas) {
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Initials
       ctx.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -303,7 +254,6 @@ export function draw(canvas) {
       ctx.fillText(initials(el.name), pos.x, pos.y);
     }
 
-    // Name label below avatar
     const LABEL_FONT_SMALL = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     ctx.font = LABEL_FONT_SMALL;
     ctx.textAlign = 'center';
