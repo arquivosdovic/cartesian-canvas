@@ -249,3 +249,61 @@
 .modal__actions .btn {
   flex: 1;
 }
+
+/* ── Capture modal swatches ──────────────────────────────────────────────── */
+.capture-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  position: relative;
+  overflow: hidden;
+}
+
+.swatch:hover {
+  border-color: var(--color-accent);
+}
+
+.swatch--active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(127, 119, 221, 0.3);
+}
+
+.swatch__fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.swatch__transparent {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-image:
+    linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+}
+
+.swatch--custom {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}

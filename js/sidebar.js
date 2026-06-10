@@ -1,19 +1,12 @@
 /**
  * sidebar.js
- * Manages all sidebar interactions: labels, add-element form,
- * element list rendering, score panel, edit modal, and coordinates display.
  */
 
 import {
-  state,
-  subscribe,
-  setLabel,
-  addElement,
-  removeElement,
-  updateElementScores,
-  updateElementMeta,
-  selectElement,
-  getSelected,
+  state, subscribe, setLabel,
+  addElement, removeElement,
+  updateElementScores, updateElementMeta,
+  toggleElementVisibility, selectElement, getSelected,
 } from './store.js';
 import { evictImageCache } from './renderer.js';
 
@@ -26,20 +19,19 @@ export function initSidebar() {
   subscribe(onStateChange);
 }
 
-// ── Label inputs ─────────────────────────────────────────────────────────────
+// ── Label inputs ──────────────────────────────────────────────────────────────
 
 function bindLabelInputs() {
-  const ids  = ['lTop', 'lBottom', 'lLeft', 'lRight'];
-  const dirs = ['top', 'bottom', 'left', 'right'];
-  ids.forEach((id, i) => {
-    const el = document.getElementById(id);
+  ['lTop','lBottom','lLeft','lRight'].forEach((id, i) => {
+    const dir = ['top','bottom','left','right'][i];
+    const el  = document.getElementById(id);
     if (!el) return;
-    el.value = state.labels[dirs[i]];
-    el.addEventListener('input', () => setLabel(dirs[i], el.value));
+    el.value = state.labels[dir];
+    el.addEventListener('input', () => setLabel(dir, el.value));
   });
 }
 
-// ── Add element form ──────────────────────────────────────────────────────────
+// ── Add form ──────────────────────────────────────────────────────────────────
 
 function bindAddForm() {
   const photoInput = document.getElementById('newPhoto');
@@ -62,14 +54,8 @@ function bindAddForm() {
     const nameInput = document.getElementById('newName');
     const name = nameInput?.value.trim();
     if (!name) { nameInput?.focus(); return; }
-
-    addElement({
-      id: Date.now(),
-      name,
-      photo: pendingPhotoDataUrl,
-      scores: { top: 0, bottom: 0, left: 0, right: 0 },
-    });
-
+    addElement({ id: Date.now(), name, photo: pendingPhotoDataUrl, hidden: false,
+                 scores: { top: 0, bottom: 0, left: 0, right: 0 } });
     nameInput.value = '';
     pendingPhotoDataUrl = null;
     preview.src = '';
@@ -85,8 +71,20 @@ function bindAddForm() {
 // ── Score inputs ──────────────────────────────────────────────────────────────
 
 function bindScoreInputs() {
-  ['sTop', 'sBottom', 'sLeft', 'sRight'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', pushScores);
+  ['sTop','sBottom','sLeft','sRight'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    // sync range <-> number inputs
+    const rangeId  = id + 'Range';
+    const rangeEl  = document.getElementById(rangeId);
+    el.addEventListener('input', () => {
+      if (rangeEl) rangeEl.value = el.value;
+      pushScores();
+    });
+    rangeEl?.addEventListener('input', () => {
+      el.value = rangeEl.value;
+      pushScores();
+    });
   });
 }
 
@@ -104,17 +102,14 @@ function pushScores() {
 // ── Edit modal ────────────────────────────────────────────────────────────────
 
 function openEditModal(el) {
-  // Remove existing modal if any
   document.getElementById('editModal')?.remove();
-
   let editPhoto = el.photo;
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'editModal';
-
   overlay.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true" aria-label="Editar elemento">
+    <div class="modal" role="dialog" aria-modal="true">
       <p class="modal__title">Editar — ${escapeHtml(el.name)}</p>
       <div class="form-group">
         <label class="form-label" for="editName">Nome</label>
@@ -127,8 +122,7 @@ function openEditModal(el) {
           <input type="file" accept="image/*" id="editPhoto" style="display:none">
         </label>
         <img id="editPhotoPreview" class="photo-preview"
-             src="${el.photo || ''}"
-             alt="Preview"
+             src="${el.photo || ''}" alt="Preview"
              style="display:${el.photo ? 'block' : 'none'}">
         ${el.photo ? `<button class="btn btn--icon btn--danger" id="editPhotoRemove" title="Remover foto"><i class="ti ti-x"></i></button>` : ''}
       </div>
@@ -138,7 +132,6 @@ function openEditModal(el) {
       </div>
     </div>
   `;
-
   document.body.appendChild(overlay);
 
   const nameInput = overlay.querySelector('#editName');
@@ -149,23 +142,15 @@ function openEditModal(el) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => {
-      editPhoto = ev.target.result;
-      preview.src = editPhoto;
-      preview.style.display = 'block';
-    };
+    reader.onload = ev => { editPhoto = ev.target.result; preview.src = editPhoto; preview.style.display = 'block'; };
     reader.readAsDataURL(file);
   });
 
   overlay.querySelector('#editPhotoRemove')?.addEventListener('click', () => {
-    editPhoto = null;
-    preview.src = '';
-    preview.style.display = 'none';
+    editPhoto = null; preview.src = ''; preview.style.display = 'none';
   });
-
   overlay.querySelector('#editCancel').addEventListener('click', () => overlay.remove());
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-
   overlay.querySelector('#editSave').addEventListener('click', () => {
     const newName = nameInput.value.trim();
     if (!newName) { nameInput.focus(); return; }
@@ -174,8 +159,7 @@ function openEditModal(el) {
     overlay.remove();
   });
 
-  nameInput.focus();
-  nameInput.select();
+  nameInput.focus(); nameInput.select();
 }
 
 // ── State reactions ───────────────────────────────────────────────────────────
@@ -205,26 +189,27 @@ function renderElementList({ elements, selectedId }) {
   }
 
   list.innerHTML = elements.map(el => `
-    <div class="elem-item ${el.id === selectedId ? 'elem-item--active' : ''}"
-         data-id="${el.id}"
-         role="button"
-         tabindex="0"
+    <div class="elem-item ${el.id === selectedId ? 'elem-item--active' : ''} ${el.hidden ? 'elem-item--hidden' : ''}"
+         data-id="${el.id}" role="button" tabindex="0"
          aria-label="Selecionar ${escapeHtml(el.name)}">
       ${el.photo
         ? `<img class="elem-item__avatar" src="${el.photo}" alt="${escapeHtml(el.name)}">`
-        : `<div class="elem-item__initials" aria-hidden="true">${initials(el.name)}</div>`
-      }
+        : `<div class="elem-item__initials" aria-hidden="true">${initials(el.name)}</div>`}
       <span class="elem-item__name">${escapeHtml(el.name)}</span>
+      <button class="btn btn--icon elem-item__vis-btn ${el.hidden ? 'elem-item__vis-btn--off' : ''}"
+              data-toggle="${el.id}"
+              aria-label="${el.hidden ? 'Mostrar' : 'Ocultar'} ${escapeHtml(el.name)}"
+              title="${el.hidden ? 'Mostrar' : 'Ocultar'}">
+        <i class="ti ${el.hidden ? 'ti-eye-off' : 'ti-eye'}" aria-hidden="true"></i>
+      </button>
       <button class="btn btn--icon elem-item__edit-btn"
               data-edit="${el.id}"
-              aria-label="Editar ${escapeHtml(el.name)}"
-              title="Editar">
+              aria-label="Editar ${escapeHtml(el.name)}" title="Editar">
         <i class="ti ti-pencil" aria-hidden="true"></i>
       </button>
       <button class="btn btn--icon btn--danger"
               data-remove="${el.id}"
-              aria-label="Remover ${escapeHtml(el.name)}"
-              title="Remover">
+              aria-label="Remover ${escapeHtml(el.name)}" title="Remover">
         <i class="ti ti-trash" aria-hidden="true"></i>
       </button>
     </div>
@@ -233,7 +218,7 @@ function renderElementList({ elements, selectedId }) {
   list.querySelectorAll('.elem-item').forEach(item => {
     const id = Number(item.dataset.id);
     item.addEventListener('click', e => {
-      if (e.target.closest('[data-remove]') || e.target.closest('[data-edit]')) return;
+      if (e.target.closest('[data-remove],[data-edit],[data-toggle]')) return;
       selectElement(id);
     });
     item.addEventListener('keydown', e => {
@@ -241,11 +226,17 @@ function renderElementList({ elements, selectedId }) {
     });
   });
 
+  list.querySelectorAll('[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      toggleElementVisibility(Number(btn.dataset.toggle));
+    });
+  });
+
   list.querySelectorAll('[data-edit]').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      const id  = Number(btn.dataset.edit);
-      const el  = state.elements.find(x => x.id === id);
+      const el = state.elements.find(x => x.id === Number(btn.dataset.edit));
       if (el) openEditModal(el);
     });
   });
@@ -261,10 +252,7 @@ function renderElementList({ elements, selectedId }) {
 function calcCoords(scores) {
   const x = (scores.right - scores.left) / 10;
   const y = (scores.top   - scores.bottom) / 10;
-  return {
-    x: Math.round(x * 10) / 10,
-    y: Math.round(y * 10) / 10,
-  };
+  return { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
 }
 
 function renderScorePanel({ selectedId, elements }) {
@@ -272,20 +260,21 @@ function renderScorePanel({ selectedId, elements }) {
   if (!panel) return;
 
   const el = elements.find(e => e.id === selectedId);
-  if (!el) {
-    panel.style.display = 'none';
-    return;
-  }
+  if (!el) { panel.style.display = 'none'; return; }
 
   panel.style.display = 'block';
   document.getElementById('panelTitle').textContent = el.name;
-  document.getElementById('sTop').value    = el.scores.top;
-  document.getElementById('sBottom').value = el.scores.bottom;
-  document.getElementById('sLeft').value   = el.scores.left;
-  document.getElementById('sRight').value  = el.scores.right;
 
-  // Coordinates display
-  const coords = calcCoords(el.scores);
+  // Sync number inputs (avoid fighting with active focus)
+  ['Top','Bottom','Left','Right'].forEach(dir => {
+    const numEl   = document.getElementById('s' + dir);
+    const rngEl   = document.getElementById('s' + dir + 'Range');
+    const val     = el.scores[dir.toLowerCase()];
+    if (numEl && document.activeElement !== numEl)   numEl.value = val;
+    if (rngEl && document.activeElement !== rngEl)   rngEl.value = val;
+  });
+
+  // Coords display
   let coordsEl = document.getElementById('coordsDisplay');
   if (!coordsEl) {
     coordsEl = document.createElement('div');
@@ -304,7 +293,8 @@ function renderScorePanel({ selectedId, elements }) {
     panel.appendChild(coordsEl);
   }
 
-  const fmt = v => (v > 0 ? '+' : '') + v.toFixed(1);
+  const coords = calcCoords(el.scores);
+  const fmt = v => (v > 0 ? '+' : '') + v.toFixed(2);
   document.getElementById('coordX').textContent = fmt(coords.x);
   document.getElementById('coordY').textContent = fmt(coords.y);
 }
@@ -317,12 +307,10 @@ function syncScoreLabels({ labels }) {
   });
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function initials(name) {
   return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
 }
 
 function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

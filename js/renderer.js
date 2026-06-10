@@ -6,7 +6,6 @@
 import { state } from './store.js';
 
 const IMAGE_CACHE = new Map();
-
 const AVATAR_RADIUS = 18;
 const MAX_SCORE = 10;
 
@@ -48,8 +47,7 @@ function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
   let currentY = y;
   for (let i = 0; i < words.length; i++) {
     const testLine = line ? line + ' ' + words[i] : words[i];
-    const metrics = ctx.measureText(testLine);
-    if (metrics.width > maxWidth && line !== '') {
+    if (ctx.measureText(testLine).width > maxWidth && line !== '') {
       ctx.fillText(line, x, currentY);
       line = words[i];
       currentY += lineHeight;
@@ -64,59 +62,56 @@ function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
 function calcCanvasPos(scores, cx, cy, rW, rH) {
   const nx = (scores.right - scores.left) / MAX_SCORE;
   const ny = (scores.top - scores.bottom) / MAX_SCORE;
-  return {
-    x: cx + nx * rW,
-    y: cy - ny * rH,
-  };
+  return { x: cx + nx * rW, y: cy - ny * rH };
 }
 
 function isDarkMode() {
-  if (document.documentElement.dataset.theme === 'dark') return true;
+  if (document.documentElement.dataset.theme === 'dark')  return true;
   if (document.documentElement.dataset.theme === 'light') return false;
-  const bg = getComputedStyle(document.documentElement)
-    .getPropertyValue('--color-bg-primary').trim();
-  if (bg) {
-    const hex = bg.replace('#', '');
-    const r = parseInt(hex.slice(0, 2), 16);
-    return r < 80;
-  }
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
 function cssVar(name, fallback) {
-  return getComputedStyle(document.documentElement)
-    .getPropertyValue(name).trim() || fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-export function draw(canvas) {
+/**
+ * Draw the plane onto any canvas (used both for display and capture).
+ * bgColor: CSS color string or null for transparent.
+ */
+export function draw(canvas, { bgColor = null } = {}) {
   if (!canvas) return;
 
   const dpr = window.devicePixelRatio || 1;
-  const W = canvas.clientWidth;
-  const H = canvas.clientHeight;
-
+  const W   = canvas.clientWidth;
+  const H   = canvas.clientHeight;
   if (W === 0 || H === 0) return;
 
-  canvas.width = W * dpr;
+  canvas.width  = W * dpr;
   canvas.height = H * dpr;
 
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, H);
 
-  const dark = isDarkMode();
-  const textColor   = cssVar('--color-text-primary',   dark ? '#e8e8e8' : '#1a1a1a');
-  const axisColor   = cssVar('--color-axis',            dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)');
-  const gridColor   = cssVar('--color-grid',            dark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.055)');
-  const labelBg     = cssVar('--color-label-bg',        dark ? 'rgba(30,30,30,0.88)' : 'rgba(255,255,255,0.88)');
-  const accentColor = cssVar('--color-accent', dark ? '#9d96e8' : '#7f77dd');
-  const accentLight = cssVar('--color-accent-light', dark ? '#2a2654' : '#eeedfe');
-  const accentDark  = cssVar('--color-accent-dark',  dark ? '#cbc8f8' : '#3c3489');
+  if (bgColor) {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, W, H);
+  }
 
-  const LABEL_FONT      = '500 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  const dark = isDarkMode();
+  const textColor   = cssVar('--color-text-primary',  dark ? '#e8e8e8' : '#1a1a1a');
+  const axisColor   = cssVar('--color-axis',           dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)');
+  const gridColor   = cssVar('--color-grid',           dark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.055)');
+  const labelBg     = cssVar('--color-label-bg',       dark ? 'rgba(30,30,30,0.88)' : 'rgba(255,255,255,0.88)');
+  const accentColor = cssVar('--color-accent',         dark ? '#9d96e8' : '#7f77dd');
+  const accentLight = cssVar('--color-accent-light',   dark ? '#2a2654' : '#eeedfe');
+  const accentDark  = cssVar('--color-accent-dark',    dark ? '#cbc8f8' : '#3c3489');
+
+  const LABEL_FONT       = '500 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   const AXIS_LABEL_MAX_W = W * 0.18;
-  const LABEL_LINE_H    = 16;
-  const LABEL_PADDING   = 10;
+  const LABEL_LINE_H     = 16;
+  const LABEL_PADDING    = 10;
 
   ctx.font = LABEL_FONT;
   const leftLabelW  = Math.min(ctx.measureText(state.labels.left).width,  AXIS_LABEL_MAX_W);
@@ -132,19 +127,17 @@ export function draw(canvas) {
   const plotX = padLeft;
   const plotY = padTop;
   const plotW = W - padLeft - padRight;
-  const plotH = H - padTop - padBottom;
+  const plotH = H - padTop  - padBottom;
+  const cx    = plotX + plotW / 2;
+  const cy    = plotY + plotH / 2;
+  const rW    = plotW / 2;
+  const rH    = plotH / 2;
 
-  const cx = plotX + plotW / 2;
-  const cy = plotY + plotH / 2;
-  const rW = plotW / 2;
-  const rH = plotH / 2;
-
-  // ── Grid ─────────────────────────────────────────────────────────────────
+  // ── Grid ──────────────────────────────────────────────────────────────────
   ctx.strokeStyle = gridColor;
-  ctx.lineWidth = 0.5;
-  const steps = 4;
-  for (let i = 1; i <= steps; i++) {
-    const f = i / steps;
+  ctx.lineWidth   = 0.5;
+  for (let i = 1; i <= 4; i++) {
+    const f = i / 4;
     [cx + rW * f, cx - rW * f].forEach(x => {
       ctx.beginPath(); ctx.moveTo(x, plotY); ctx.lineTo(x, plotY + plotH); ctx.stroke();
     });
@@ -152,9 +145,6 @@ export function draw(canvas) {
       ctx.beginPath(); ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW, y); ctx.stroke();
     });
   }
-
-  ctx.strokeStyle = gridColor;
-  ctx.lineWidth = 0.5;
   ctx.strokeRect(plotX, plotY, plotW, plotH);
 
   // ── Axes ──────────────────────────────────────────────────────────────────
@@ -188,39 +178,37 @@ export function draw(canvas) {
   ctx.closePath(); ctx.fill();
 
   // ── Axis labels ───────────────────────────────────────────────────────────
-  ctx.font = LABEL_FONT;
+  ctx.font      = LABEL_FONT;
   ctx.fillStyle = textColor;
 
-  ctx.textAlign = 'center';
+  ctx.textAlign    = 'center';
   ctx.textBaseline = 'bottom';
   ctx.fillText(state.labels.top, cx, plotY - LABEL_PADDING);
 
   ctx.textBaseline = 'top';
   ctx.fillText(state.labels.bottom, cx, plotY + plotH + LABEL_PADDING);
 
-  ctx.textAlign = 'right';
+  ctx.textAlign    = 'right';
   ctx.textBaseline = 'middle';
-  const leftTotalH = leftLines * LABEL_LINE_H;
-  const leftStartY = cy - leftTotalH / 2 + LABEL_LINE_H / 2;
+  const leftStartY = cy - (leftLines * LABEL_LINE_H) / 2 + LABEL_LINE_H / 2;
   drawWrappedText(ctx, state.labels.left, plotX - LABEL_PADDING, leftStartY, AXIS_LABEL_MAX_W, LABEL_LINE_H);
 
   ctx.textAlign = 'left';
-  const rightTotalH = rightLines * LABEL_LINE_H;
-  const rightStartY = cy - rightTotalH / 2 + LABEL_LINE_H / 2;
+  const rightStartY = cy - (rightLines * LABEL_LINE_H) / 2 + LABEL_LINE_H / 2;
   drawWrappedText(ctx, state.labels.right, plotX + plotW + LABEL_PADDING, rightStartY, AXIS_LABEL_MAX_W, LABEL_LINE_H);
 
-  // ── Elements ──────────────────────────────────────────────────────────────
+  // ── Elements (skip hidden) ────────────────────────────────────────────────
   ctx.textBaseline = 'alphabetic';
 
-  state.elements.forEach(el => {
-    const pos = calcCanvasPos(el.scores, cx, cy, rW, rH);
+  state.elements.filter(el => !el.hidden).forEach(el => {
+    const pos        = calcCanvasPos(el.scores, cx, cy, rW, rH);
     const isSelected = el.id === state.selectedId;
 
     if (isSelected) {
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, AVATAR_RADIUS + 4, 0, Math.PI * 2);
       ctx.strokeStyle = accentColor;
-      ctx.lineWidth = 2;
+      ctx.lineWidth   = 2;
       ctx.stroke();
     }
 
@@ -232,51 +220,41 @@ export function draw(canvas) {
       ctx.clip();
       ctx.drawImage(img, pos.x - AVATAR_RADIUS, pos.y - AVATAR_RADIUS, AVATAR_RADIUS * 2, AVATAR_RADIUS * 2);
       ctx.restore();
-
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, AVATAR_RADIUS, 0, Math.PI * 2);
       ctx.strokeStyle = isSelected ? accentColor : 'rgba(255,255,255,0.5)';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth   = 1.5;
       ctx.stroke();
     } else {
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, AVATAR_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = isSelected ? accentLight : (dark ? '#333' : '#d3d1c7');
+      ctx.fillStyle   = isSelected ? accentLight : (dark ? '#333' : '#d3d1c7');
       ctx.fill();
       ctx.strokeStyle = isSelected ? accentColor : axisColor;
-      ctx.lineWidth = 1;
+      ctx.lineWidth   = 1;
       ctx.stroke();
-
-      ctx.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-      ctx.textAlign = 'center';
+      ctx.font         = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = isSelected ? accentDark : textColor;
+      ctx.fillStyle    = isSelected ? accentDark : textColor;
       ctx.fillText(initials(el.name), pos.x, pos.y);
     }
 
-    const LABEL_FONT_SMALL = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-    ctx.font = LABEL_FONT_SMALL;
-    ctx.textAlign = 'center';
+    ctx.font         = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.textAlign    = 'center';
     ctx.textBaseline = 'alphabetic';
-
     const nameW = ctx.measureText(el.name).width;
-    const lx = pos.x;
-    const ly = pos.y + AVATAR_RADIUS + 13;
-
+    const lx    = pos.x;
+    const ly    = pos.y + AVATAR_RADIUS + 13;
     ctx.fillStyle = labelBg;
     ctx.beginPath();
     ctx.roundRect(lx - nameW / 2 - 4, ly - 11, nameW + 8, 15, 3);
     ctx.fill();
-
     ctx.fillStyle = textColor;
     ctx.fillText(el.name, lx, ly);
   });
 }
 
 function initials(name) {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map(w => w[0]?.toUpperCase() || '')
-    .join('');
+  return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
 }

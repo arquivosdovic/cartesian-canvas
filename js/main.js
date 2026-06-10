@@ -1,26 +1,19 @@
 /**
  * main.js
- * Entry point. Wires together store, renderer, sidebar, and persistence.
+ * Entry point.
  */
 
 import { subscribe } from './store.js';
-import { init as initRenderer, requestRedraw } from './renderer.js';
+import { init as initRenderer, requestRedraw, draw } from './renderer.js';
 import { initSidebar } from './sidebar.js';
 import { exportProject, importProject } from './persistence.js';
 import { showToast } from './toast.js';
 
-// ── Theme management ──────────────────────────────────────────────────────────
+// ── Theme ─────────────────────────────────────────────────────────────────────
 
-function getSystemPrefersDark() {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
-function getStoredTheme() {
-  return localStorage.getItem('theme'); // 'light' | 'dark' | null
-}
+function getStoredTheme() { return localStorage.getItem('theme'); }
 
 function applyTheme(theme) {
-  // theme: 'light' | 'dark'
   document.documentElement.dataset.theme = theme;
   const btn = document.getElementById('btnTheme');
   if (btn) {
@@ -33,42 +26,123 @@ function applyTheme(theme) {
 
 function initTheme() {
   const stored = getStoredTheme();
-  const theme  = stored || (getSystemPrefersDark() ? 'dark' : 'light');
+  const theme  = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   applyTheme(theme);
 
   document.getElementById('btnTheme')?.addEventListener('click', () => {
-    const current = document.documentElement.dataset.theme;
-    const next    = current === 'dark' ? 'light' : 'dark';
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('theme', next);
     applyTheme(next);
     requestRedraw();
   });
 
-  // Follow system if no manual override
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-    if (!getStoredTheme()) {
-      applyTheme(e.matches ? 'dark' : 'light');
-      requestRedraw();
-    }
+    if (!getStoredTheme()) { applyTheme(e.matches ? 'dark' : 'light'); requestRedraw(); }
   });
 }
 
-// ── Capture canvas as PNG ─────────────────────────────────────────────────────
+// ── Capture modal ─────────────────────────────────────────────────────────────
 
-function captureCanvas(canvas) {
-  const url = canvas.toDataURL('image/png');
-  const a   = document.createElement('a');
-  a.href    = url;
-  a.download = `plano-cartesiano-${new Date().toISOString().slice(0,16).replace('T','_').replace(':','-')}.png`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+const PRESET_COLORS = [
+  { label: 'Branco',       value: '#ffffff' },
+  { label: 'Creme',        value: '#f5f4f0' },
+  { label: 'Cinza claro',  value: '#e8e8e8' },
+  { label: 'Cinza escuro', value: '#2c2c2c' },
+  { label: 'Preto',        value: '#1a1a1a' },
+  { label: 'Transparente', value: null      },
+];
+
+function openCaptureModal(canvas) {
+  document.getElementById('captureModal')?.remove();
+
+  const dark = document.documentElement.dataset.theme === 'dark';
+  let selectedBg = dark ? '#1e1e1e' : '#ffffff';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'captureModal';
+
+  overlay.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Capturar imagem">
+      <p class="modal__title">Capturar imagem</p>
+      <p class="form-label" style="margin-bottom:8px">Cor de fundo</p>
+      <div class="capture-swatches" id="captureSwatches">
+        ${PRESET_COLORS.map(c => `
+          <button class="swatch ${c.value === selectedBg ? 'swatch--active' : ''}"
+                  data-color="${c.value ?? '__transparent__'}"
+                  title="${c.label}"
+                  aria-label="${c.label}">
+            ${c.value === null
+              ? '<span class="swatch__transparent"></span>'
+              : `<span class="swatch__fill" style="background:${c.value}"></span>`}
+          </button>
+        `).join('')}
+        <label class="swatch swatch--custom" title="Escolher cor" aria-label="Cor personalizada">
+          <i class="ti ti-color-picker" style="font-size:14px;pointer-events:none"></i>
+          <input type="color" id="captureCustomColor" value="${dark ? '#1e1e1e' : '#ffffff'}" style="opacity:0;position:absolute;width:0;height:0">
+        </label>
+      </div>
+      <p class="hint" style="margin-top:6px" id="captureHint">Fundo: ${dark ? '#1e1e1e' : '#ffffff'}</p>
+      <div class="modal__actions">
+        <button class="btn" id="captureCancel">Cancelar</button>
+        <button class="btn btn--primary" id="captureSave">
+          <i class="ti ti-camera" aria-hidden="true"></i> Baixar PNG
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  function setSelected(val) {
+    selectedBg = val;
+    overlay.querySelectorAll('.swatch').forEach(s => s.classList.remove('swatch--active'));
+    const key = val === null ? '__transparent__' : val;
+    overlay.querySelector(`[data-color="${key}"]`)?.classList.add('swatch--active');
+    const hint = document.getElementById('captureHint');
+    if (hint) hint.textContent = val === null ? 'Fundo: transparente (PNG com alpha)' : `Fundo: ${val}`;
+  }
+
+  overlay.querySelectorAll('[data-color]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const raw = btn.dataset.color;
+      setSelected(raw === '__transparent__' ? null : raw);
+    });
+  });
+
+  const customInput = document.getElementById('captureCustomColor');
+  customInput.addEventListener('input', () => setSelected(customInput.value));
+
+  overlay.querySelector('#captureCancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#captureSave').addEventListener('click', () => {
+    // Draw onto an offscreen canvas at full resolution
+    const off = document.createElement('canvas');
+    off.width  = canvas.width;
+    off.height = canvas.height;
+    off.style.width  = canvas.clientWidth  + 'px';
+    off.style.height = canvas.clientHeight + 'px';
+
+    draw(off, { bgColor: selectedBg });
+
+    const url = off.toDataURL('image/png');
+    const a   = document.createElement('a');
+    a.href     = url;
+    a.download = `plano-${new Date().toISOString().slice(0,16).replace('T','_').replace(':','-')}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    overlay.remove();
+    showToast('Imagem salva!');
+  });
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 function main() {
-  const canvas  = document.getElementById('plane');
+  const canvas = document.getElementById('plane');
   if (!canvas) return;
 
   initTheme();
@@ -76,15 +150,9 @@ function main() {
   initSidebar();
 
   subscribe(() => requestRedraw());
+  new ResizeObserver(() => requestRedraw()).observe(canvas.parentElement);
 
-  const resizeObserver = new ResizeObserver(() => requestRedraw());
-  resizeObserver.observe(canvas.parentElement);
-
-  // Toolbar buttons
-  document.getElementById('btnCapture')?.addEventListener('click', () => {
-    captureCanvas(canvas);
-    showToast('Imagem salva!');
-  });
+  document.getElementById('btnCapture')?.addEventListener('click', () => openCaptureModal(canvas));
 
   document.getElementById('btnExport')?.addEventListener('click', () => {
     try {
@@ -98,7 +166,7 @@ function main() {
   document.getElementById('btnImport')?.addEventListener('click', async () => {
     try {
       const project = await importProject();
-      if (project) showToast(`Projeto importado — ${project.elements.length} elemento(s) carregado(s).`);
+      if (project) showToast(`Importado — ${project.elements.length} elemento(s).`);
     } catch (err) {
       showToast(err, 'error');
     }

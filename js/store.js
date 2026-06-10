@@ -1,7 +1,6 @@
 /**
  * store.js
  * Central state for elements and axis labels.
- * Uses a simple observer pattern so modules can react to changes.
  */
 
 const listeners = [];
@@ -55,9 +54,17 @@ export function updateElementScores(id, scores) {
 export function updateElementMeta(id, { name, photo }) {
   const el = state.elements.find(e => e.id === id);
   if (!el) return;
-  if (name !== undefined) el.name = name;
+  if (name  !== undefined) el.name  = name;
   if (photo !== undefined) el.photo = photo;
   notify();
+}
+
+export function toggleElementVisibility(id) {
+  const el = state.elements.find(e => e.id === id);
+  if (el) {
+    el.hidden = !el.hidden;
+    notify();
+  }
 }
 
 export function selectElement(id) {
@@ -69,12 +76,9 @@ export function getSelected() {
   return state.elements.find(e => e.id === state.selectedId) || null;
 }
 
-/**
- * Replace entire state at once (used by import).
- */
 export function loadState({ labels, elements, selectedId }) {
   state.labels     = { ...labels };
-  state.elements   = elements.map(el => ({ ...el, scores: { ...el.scores } }));
+  state.elements   = elements.map(el => ({ hidden: false, ...el, scores: { ...el.scores } }));
   state.selectedId = selectedId ?? null;
   notify();
 }
