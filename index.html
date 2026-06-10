@@ -59,30 +59,22 @@
       </section>
 
       <section class="card" id="section-scores" style="display:none">
-        <h3 class="card__title" id="panelTitle">Pontuações</h3>
+        <h3 class="card__title" id="panelTitle">Posição</h3>
         <div class="scores-list">
-          <div class="score-row">
-            <label class="score-row__label" id="sl_top">Topo</label>
-            <input class="score-range" type="range" id="sTopRange" value="0" min="-10" max="10" step="0.5">
-            <input class="score-num form-input" type="number" id="sTop" value="0" min="-10" max="10" step="0.5">
+          <div class="score-row score-row--axis">
+            <span class="score-row__label score-row__label--left" id="sl_left">Esquerda</span>
+            <input class="score-range" type="range" id="sHRange" value="0" min="-10" max="10" step="0.5">
+            <span class="score-row__label score-row__label--right" id="sl_right">Direita</span>
+            <input class="score-num form-input" type="number" id="sHNum" value="0" min="-10" max="10" step="0.5">
           </div>
-          <div class="score-row">
-            <label class="score-row__label" id="sl_bottom">Base</label>
-            <input class="score-range" type="range" id="sBottomRange" value="0" min="-10" max="10" step="0.5">
-            <input class="score-num form-input" type="number" id="sBottom" value="0" min="-10" max="10" step="0.5">
-          </div>
-          <div class="score-row">
-            <label class="score-row__label" id="sl_left">Esquerda</label>
-            <input class="score-range" type="range" id="sLeftRange" value="0" min="-10" max="10" step="0.5">
-            <input class="score-num form-input" type="number" id="sLeft" value="0" min="-10" max="10" step="0.5">
-          </div>
-          <div class="score-row">
-            <label class="score-row__label" id="sl_right">Direita</label>
-            <input class="score-range" type="range" id="sRightRange" value="0" min="-10" max="10" step="0.5">
-            <input class="score-num form-input" type="number" id="sRight" value="0" min="-10" max="10" step="0.5">
+          <div class="score-row score-row--axis">
+            <span class="score-row__label score-row__label--left" id="sl_bottom">Base</span>
+            <input class="score-range" type="range" id="sVRange" value="0" min="-10" max="10" step="0.5">
+            <span class="score-row__label score-row__label--right" id="sl_top">Topo</span>
+            <input class="score-num form-input" type="number" id="sVNum" value="0" min="-10" max="10" step="0.5">
           </div>
         </div>
-        <p class="hint">−10 a 10 · incrementos de 0,5 · valores intermediários aceitos</p>
+        <p class="hint">−10 a 10 · arraste no gráfico ou use os controles</p>
       </section>
 
       <section class="card" id="section-elements">

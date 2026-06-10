@@ -258,3 +258,72 @@ export function draw(canvas, { bgColor = null } = {}) {
 function initials(name) {
   return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
 }
+
+// ── Canvas drag support ───────────────────────────────────────────────────────
+//
+// Returns {x, y} in canvas plot coordinates (normalised -1..1) for a mouse/touch event.
+
+export function getPlotGeometry(canvas) {
+  if (!canvas) return null;
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.clientWidth;
+  const H   = canvas.clientHeight;
+
+  // Mirror the padding logic from draw()
+  const LABEL_FONT       = '500 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  const AXIS_LABEL_MAX_W = W * 0.18;
+  const LABEL_LINE_H     = 16;
+  const LABEL_PADDING    = 10;
+
+  const ctx = canvas.getContext('2d');
+  ctx.font = LABEL_FONT;
+  const leftLabelW  = Math.min(ctx.measureText(state.labels.left).width,  AXIS_LABEL_MAX_W);
+  const rightLabelW = Math.min(ctx.measureText(state.labels.right).width, AXIS_LABEL_MAX_W);
+
+  const padTop    = LABEL_LINE_H + LABEL_PADDING + 20;
+  const padBottom = LABEL_LINE_H + LABEL_PADDING + 20;
+  const padLeft   = leftLabelW  + LABEL_PADDING + 16;
+  const padRight  = rightLabelW + LABEL_PADDING + 16;
+
+  const plotX = padLeft;
+  const plotY = padTop;
+  const plotW = W - padLeft - padRight;
+  const plotH = H - padTop  - padBottom;
+  const cx    = plotX + plotW / 2;
+  const cy    = plotY + plotH / 2;
+  const rW    = plotW / 2;
+  const rH    = plotH / 2;
+
+  return { cx, cy, rW, rH, plotX, plotY, plotW, plotH, W, H };
+}
+
+export function canvasPosToScores(clientX, clientY, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const x    = clientX - rect.left;
+  const y    = clientY - rect.top;
+  const geo  = getPlotGeometry(canvas);
+  if (!geo) return null;
+  const nx = Math.max(-1, Math.min(1, (x - geo.cx) / geo.rW));
+  const ny = Math.max(-1, Math.min(1, (y - geo.cy) / geo.rH));  // canvas Y is inverted
+  const h  = Math.round(nx * 10 * 2) / 2;
+  const v  = Math.round(-ny * 10 * 2) / 2;
+  return { h, v };
+}
+
+export function hitTestElement(clientX, clientY, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const x    = clientX - rect.left;
+  const y    = clientY - rect.top;
+  const geo  = getPlotGeometry(canvas);
+  if (!geo) return null;
+
+  for (let i = state.elements.length - 1; i >= 0; i--) {
+    const el  = state.elements[i];
+    if (el.hidden) continue;
+    const pos = calcCanvasPos(el.scores, geo.cx, geo.cy, geo.rW, geo.rH);
+    const dx  = x - pos.x;
+    const dy  = y - pos.y;
+    if (Math.sqrt(dx * dx + dy * dy) <= AVATAR_RADIUS + 6) return el.id;
+  }
+  return null;
+}

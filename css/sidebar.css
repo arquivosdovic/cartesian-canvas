@@ -192,3 +192,19 @@
 .elem-item--hidden .elem-item__initials {
   filter: grayscale(1);
 }
+
+/* ── 2-axis score rows ───────────────────────────────────────────────────── */
+.score-row--axis {
+  grid-template-columns: auto 1fr auto 48px;
+  gap: 5px;
+}
+
+.score-row__label--left,
+.score-row__label--right {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  max-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

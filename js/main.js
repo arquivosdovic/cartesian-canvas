@@ -3,9 +3,9 @@
  * Entry point.
  */
 
-import { subscribe } from './store.js';
-import { init as initRenderer, requestRedraw, draw } from './renderer.js';
-import { initSidebar } from './sidebar.js';
+import { subscribe, selectElement, updateElementScores, state } from './store.js';
+import { init as initRenderer, requestRedraw, draw, hitTestElement, canvasPosToScores } from './renderer.js';
+import { initSidebar, setAxisValues } from './sidebar.js';
 import { exportProject, importProject } from './persistence.js';
 import { showToast } from './toast.js';
 
@@ -50,6 +50,14 @@ const PRESET_COLORS = [
   { label: 'Cinza escuro', value: '#2c2c2c' },
   { label: 'Preto',        value: '#1a1a1a' },
   { label: 'Transparente', value: null      },
+  { label: 'Rosa suave',   value: '#fce4ec' },
+  { label: 'Lilás',        value: '#ede7f6' },
+  { label: 'Céu',          value: '#e3f2fd' },
+  { label: 'Menta',        value: '#e8f5e9' },
+  { label: 'Pêssego',      value: '#fff3e0' },
+  { label: 'Violeta',      value: '#4a3f8f' },
+  { label: 'Ardósia',      value: '#37474f' },
+  { label: 'Floresta',     value: '#1b4332' },
 ];
 
 function openCaptureModal(canvas) {
@@ -149,6 +157,60 @@ function main() {
 
   subscribe(() => requestRedraw());
   new ResizeObserver(() => requestRedraw()).observe(canvas.parentElement);
+
+  // ── Canvas drag ─────────────────────────────────────────────────────────────
+  let draggingId = null;
+
+  function startDrag(clientX, clientY) {
+    const id = hitTestElement(clientX, clientY, canvas);
+    if (id == null) return false;
+    draggingId = id;
+    selectElement(id);
+    canvas.style.cursor = 'grabbing';
+    return true;
+  }
+
+  function moveDrag(clientX, clientY) {
+    if (draggingId == null) return;
+    const scores = canvasPosToScores(clientX, clientY, canvas);
+    if (!scores) return;
+    updateElementScores(draggingId, {
+      right:  scores.h > 0 ? scores.h  : 0,
+      left:   scores.h < 0 ? -scores.h : 0,
+      top:    scores.v > 0 ? scores.v  : 0,
+      bottom: scores.v < 0 ? -scores.v : 0,
+    });
+    setAxisValues(scores.h, scores.v);
+  }
+
+  function endDrag() {
+    draggingId = null;
+    canvas.style.cursor = '';
+  }
+
+  canvas.addEventListener('mousedown', e => { startDrag(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', e => { moveDrag(e.clientX, e.clientY); });
+  window.addEventListener('mouseup',   endDrag);
+
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    if (startDrag(t.clientX, t.clientY)) e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    if (draggingId == null || e.touches.length !== 1) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    moveDrag(t.clientX, t.clientY);
+  }, { passive: false });
+  canvas.addEventListener('touchend', endDrag);
+
+  // Change cursor on hover over elements
+  canvas.addEventListener('mousemove', e => {
+    if (draggingId != null) return;
+    const id = hitTestElement(e.clientX, e.clientY, canvas);
+    canvas.style.cursor = id != null ? 'grab' : '';
+  });
 
   document.getElementById('btnCapture')?.addEventListener('click', () => openCaptureModal(canvas));
 

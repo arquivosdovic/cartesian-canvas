@@ -68,35 +68,67 @@ function bindAddForm() {
   });
 }
 
-// ── Score inputs ──────────────────────────────────────────────────────────────
+// ── Score inputs (2-axis sliders) ────────────────────────────────────────────
+//
+// sHRange / sHNum  →  horizontal axis  (left ← 0 → right), value = right − left
+// sVRange / sVNum  →  vertical axis    (bottom ← 0 → top),  value = top − bottom
+//
+// We store the net position on each axis; when we push back to the store we
+// set the "winning" side to |value| and the opposing side to 0.
 
 function bindScoreInputs() {
-  ['sTop','sBottom','sLeft','sRight'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    // sync range <-> number inputs
-    const rangeId  = id + 'Range';
-    const rangeEl  = document.getElementById(rangeId);
-    el.addEventListener('input', () => {
-      if (rangeEl) rangeEl.value = el.value;
-      pushScores();
-    });
-    rangeEl?.addEventListener('input', () => {
-      el.value = rangeEl.value;
-      pushScores();
-    });
-  });
+  const hRange = document.getElementById('sHRange');
+  const hNum   = document.getElementById('sHNum');
+  const vRange = document.getElementById('sVRange');
+  const vNum   = document.getElementById('sVNum');
+
+  function syncH(src, val) {
+    const v = clampAxis(parseFloat(val) || 0);
+    if (src !== hRange && hRange) hRange.value = v;
+    if (src !== hNum  && hNum)   hNum.value  = v;
+    pushScores();
+  }
+  function syncV(src, val) {
+    const v = clampAxis(parseFloat(val) || 0);
+    if (src !== vRange && vRange) vRange.value = v;
+    if (src !== vNum  && vNum)   vNum.value  = v;
+    pushScores();
+  }
+
+  hRange?.addEventListener('input', () => syncH(hRange, hRange.value));
+  hNum?.addEventListener('input',   () => syncH(hNum,   hNum.value));
+  vRange?.addEventListener('input', () => syncV(vRange, vRange.value));
+  vNum?.addEventListener('input',   () => syncV(vNum,   vNum.value));
+}
+
+function clampAxis(v) {
+  return Math.max(-10, Math.min(10, Math.round(v * 2) / 2));
 }
 
 function pushScores() {
   const selected = getSelected();
   if (!selected) return;
+  const h = clampAxis(parseFloat(document.getElementById('sHNum')?.value) || 0);
+  const v = clampAxis(parseFloat(document.getElementById('sVNum')?.value) || 0);
   updateElementScores(selected.id, {
-    top:    parseFloat(document.getElementById('sTop').value)    || 0,
-    bottom: parseFloat(document.getElementById('sBottom').value) || 0,
-    left:   parseFloat(document.getElementById('sLeft').value)   || 0,
-    right:  parseFloat(document.getElementById('sRight').value)  || 0,
+    right:  h > 0 ? h  : 0,
+    left:   h < 0 ? -h : 0,
+    top:    v > 0 ? v  : 0,
+    bottom: v < 0 ? -v : 0,
   });
+}
+
+// Public: set axis slider values from outside (e.g. canvas drag)
+export function setAxisValues(h, v) {
+  const hRange = document.getElementById('sHRange');
+  const hNum   = document.getElementById('sHNum');
+  const vRange = document.getElementById('sVRange');
+  const vNum   = document.getElementById('sVNum');
+  if (hRange) hRange.value = h;
+  if (hNum)   hNum.value   = h;
+  if (vRange) vRange.value = v;
+  if (vNum)   vNum.value   = v;
+  pushScores();
 }
 
 // ── Edit modal ────────────────────────────────────────────────────────────────
@@ -265,14 +297,18 @@ function renderScorePanel({ selectedId, elements }) {
   panel.style.display = 'block';
   document.getElementById('panelTitle').textContent = el.name;
 
-  // Sync number inputs (avoid fighting with active focus)
-  ['Top','Bottom','Left','Right'].forEach(dir => {
-    const numEl   = document.getElementById('s' + dir);
-    const rngEl   = document.getElementById('s' + dir + 'Range');
-    const val     = el.scores[dir.toLowerCase()];
-    if (numEl && document.activeElement !== numEl)   numEl.value = val;
-    if (rngEl && document.activeElement !== rngEl)   rngEl.value = val;
-  });
+  // Derive net axis values from stored 4-score model
+  const h = (el.scores.right  || 0) - (el.scores.left   || 0);
+  const v = (el.scores.top    || 0) - (el.scores.bottom || 0);
+
+  const hRange = document.getElementById('sHRange');
+  const hNum   = document.getElementById('sHNum');
+  const vRange = document.getElementById('sVRange');
+  const vNum   = document.getElementById('sVNum');
+  if (hRange && document.activeElement !== hRange) hRange.value = h;
+  if (hNum   && document.activeElement !== hNum)   hNum.value   = h;
+  if (vRange && document.activeElement !== vRange) vRange.value = v;
+  if (vNum   && document.activeElement !== vNum)   vNum.value   = v;
 
   // Coords display
   let coordsEl = document.getElementById('coordsDisplay');
