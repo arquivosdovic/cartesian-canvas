@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plano Cartesiano</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/canvas.css">
+  <link rel="stylesheet" href="css/toolbar.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar">
+
+      <section class="card" id="section-labels">
+        <h3 class="card__title">Rótulos dos eixos</h3>
+        <div class="axis-grid">
+          <div class="axis-grid__center">
+            <label class="form-label" for="lTop">Topo</label>
+            <input class="form-input" type="text" id="lTop" value="Alto" placeholder="Rótulo do topo">
+          </div>
+          <div>
+            <label class="form-label" for="lLeft">Esquerda</label>
+            <input class="form-input" type="text" id="lLeft" value="Esquerda" placeholder="Rótulo esquerdo">
+          </div>
+          <div>
+            <label class="form-label" for="lRight">Direita</label>
+            <input class="form-input" type="text" id="lRight" value="Direita" placeholder="Rótulo direito">
+          </div>
+          <div class="axis-grid__center">
+            <label class="form-label" for="lBottom">Base</label>
+            <input class="form-input" type="text" id="lBottom" value="Baixo" placeholder="Rótulo da base">
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="section-add">
+        <h3 class="card__title">Adicionar elemento</h3>
+        <div class="form-group">
+          <label class="form-label" for="newName">Nome</label>
+          <input class="form-input" type="text" id="newName" placeholder="Nome do elemento">
+        </div>
+        <div class="form-group form-group--row">
+          <label class="form-label">Foto</label>
+          <label class="btn-upload" for="newPhoto">
+            <i class="ti ti-upload" aria-hidden="true"></i> Subir foto
+            <input type="file" accept="image/*" id="newPhoto" style="display:none">
+          </label>
+          <img id="photoPreview" class="photo-preview" alt="Preview" style="display:none">
+        </div>
+        <button class="btn btn--primary" id="btnAdd">
+          <i class="ti ti-plus" aria-hidden="true"></i> Adicionar
+        </button>
+      </section>
+
+      <section class="card" id="section-scores" style="display:none">
+        <h3 class="card__title" id="panelTitle">Pontuações</h3>
+        <div class="scores-grid">
+          <div class="score-field">
+            <label class="form-label" id="sl_top">Topo</label>
+            <input class="form-input" type="number" id="sTop" value="0" min="-10" max="10" step="1">
+          </div>
+          <div class="score-field">
+            <label class="form-label" id="sl_bottom">Base</label>
+            <input class="form-input" type="number" id="sBottom" value="0" min="-10" max="10" step="1">
+          </div>
+          <div class="score-field">
+            <label class="form-label" id="sl_left">Esquerda</label>
+            <input class="form-input" type="number" id="sLeft" value="0" min="-10" max="10" step="1">
+          </div>
+          <div class="score-field">
+            <label class="form-label" id="sl_right">Direita</label>
+            <input class="form-input" type="number" id="sRight" value="0" min="-10" max="10" step="1">
+          </div>
+        </div>
+        <p class="hint">Pontuação de −10 a 10 por direção</p>
+      </section>
+
+      <section class="card" id="section-elements">
+        <h3 class="card__title">Elementos</h3>
+        <div class="elem-list" id="elemList">
+          <p class="empty-state">Nenhum elemento ainda.</p>
+        </div>
+      </section>
+
+    </aside>
+
+    <main class="main-area">
+      <div class="toolbar" id="toolbar">
+        <span class="toolbar__title">Plano Cartesiano</span>
+        <div class="toolbar__actions">
+          <button class="btn btn--toolbar" id="btnImport">
+            <i class="ti ti-folder-open" aria-hidden="true"></i>
+            <span>Importar</span>
+          </button>
+          <button class="btn btn--toolbar btn--toolbar-primary" id="btnExport">
+            <i class="ti ti-download" aria-hidden="true"></i>
+            <span>Exportar</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="canvas-wrapper" id="canvasWrapper">
+        <canvas id="plane" aria-label="Plano cartesiano com elementos posicionados"></canvas>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
