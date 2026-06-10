@@ -117,22 +117,20 @@ function openCaptureModal(canvas) {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
   overlay.querySelector('#captureSave').addEventListener('click', () => {
-    // Draw onto an offscreen canvas at full resolution
-    const off = document.createElement('canvas');
-    off.width  = canvas.width;
-    off.height = canvas.height;
-    off.style.width  = canvas.clientWidth  + 'px';
-    off.style.height = canvas.clientHeight + 'px';
+    // 1. Redraw onto the live canvas with the chosen background colour
+    draw(canvas, { bgColor: selectedBg });
 
-    draw(off, { bgColor: selectedBg });
-
-    const url = off.toDataURL('image/png');
+    // 2. Export — canvas already has correct pixel dimensions
+    const url = canvas.toDataURL('image/png');
     const a   = document.createElement('a');
     a.href     = url;
     a.download = `plano-${new Date().toISOString().slice(0,16).replace('T','_').replace(':','-')}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+
+    // 3. Redraw without background so the canvas stays transparent in the UI
+    draw(canvas);
 
     overlay.remove();
     showToast('Imagem salva!');
